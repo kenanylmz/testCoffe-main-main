@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "446979866882",
+    "project_id": "testsadakat-c19ea",
+    "storage_bucket": "testsadakat-c19ea.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:446979866882:android:61b80ce7e29ee00892421b",
+        "android_client_info": {
+          "package_name": "com.testcoffe"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAkTn1p5hI7XUlqcqmyEq3-Daui-rrU2SQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
