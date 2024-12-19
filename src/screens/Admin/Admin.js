@@ -1,4 +1,4 @@
-import React from 'react';
+import React from 'react'; //Admin 
 import { View, Text, StyleSheet, TouchableOpacity, Image, BackHandler } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
