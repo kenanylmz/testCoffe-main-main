@@ -2,6 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { View, StyleSheet, Text, TouchableOpacity, Alert } from 'react-native';
 import { Camera, useCameraDevice, useCodeScanner } from 'react-native-vision-camera';
 import { incrementCoffeeCount, redeemGift } from '../../config/firebase';
+import auth from '@react-native-firebase/auth';
+import database from '@react-native-firebase/database';
 
 const QRScanner = () => {
   const [hasPermission, setHasPermission] = useState(null);
@@ -17,6 +19,21 @@ const QRScanner = () => {
         parsedQR = JSON.parse(qrData);
       } catch {
         throw new Error('QR kod geçersiz formatta.');
+      }
+
+      // Get current admin's data
+      const adminSnapshot = await database()
+        .ref(`users/${auth().currentUser.uid}`)
+        .once('value');
+      const adminData = adminSnapshot.val();
+
+      if (!adminData || !adminData.cafename) {
+        throw new Error('Admin kafe ismi tanımlanmamış. Lütfen süper admin ile iletişime geçin.');
+      }
+
+      // Check if QR code's cafename matches admin's cafename
+      if (parsedQR.cafeName !== adminData.cafename) {
+        throw new Error(`Bu QR kod ${adminData.cafename} kafesine ait değil. Sadece kendi kafenize ait QR kodları okutabilirsiniz.`);
       }
 
       // Kupon QR kodu kontrolü

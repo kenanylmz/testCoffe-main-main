@@ -11,12 +11,13 @@ export const signUp = async (email, password, name, surname) => {
       displayName: `${name} ${surname}`,
     });
 
-    // Add user to realtime database with default role
+    // Add user to realtime database with default role and usercafe
     await database().ref(`users/${userCredential.user.uid}`).set({
       email: email,
       name: name,
       surname: surname,
       role: 'user',
+      cafename: 'usercafe',
       createdAt: database.ServerValue.TIMESTAMP
     });
 
@@ -64,11 +65,12 @@ export const signIn = async (email, password) => {
     
     const userData = userSnapshot.val();
     
-    // If user data doesn't exist in database, create it with default role
+    // If user data doesn't exist in database, create it with default role and cafename
     if (!userData) {
       const defaultUserData = {
         email: userCredential.user.email,
         role: 'user',
+        cafename: 'usercafe',
         createdAt: database.ServerValue.TIMESTAMP
       };
       
@@ -175,12 +177,19 @@ export const addAdmin = async (email, password, name, surname) => {
       }
     }
 
+    // Get super admin's cafename
+    const currentUserSnapshot = await database()
+      .ref(`users/${auth().currentUser.uid}`)
+      .once('value');
+    const superAdminCafename = currentUserSnapshot.val()?.cafename;
+
     // Database'e admin rolüyle ekle/güncelle
     await database().ref(`users/${userId}`).set({
       email: email,
       name: name,
       surname: surname,
       role: 'admin',
+      cafename: superAdminCafename,
       createdAt: database.ServerValue.TIMESTAMP
     });
 
