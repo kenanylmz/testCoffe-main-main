@@ -287,28 +287,45 @@ export const incrementCoffeeCount = async (userId, cafeName, qrData) => {
 };
 
 // Hediye kullanımını işle
-export const redeemGift = async (userId, cafeName) => {
+export const redeemGift = async (userId, cafeName, couponId) => {
   try {
-    const userCafeRef = database().ref(`users/${userId}/cafes/${cafeName}`);
-    const snapshot = await userCafeRef.once('value');
-    const cafeData = snapshot.val();
-
-    if (!cafeData?.hasGift) {
+    // Önce kullanıcı bilgilerini al
+    const userSnapshot = await database().ref(`users/${userId}`).once('value');
+    const userData = userSnapshot.val();
+    
+    if (!userData) {
       return {
         success: false,
-        error: 'Hediye hakkı bulunmamaktadır.'
+        error: 'Kullanıcı bulunamadı.'
       };
     }
 
-    // Hediyeyi kullan ve kahve sayısını sıfırla
-    await userCafeRef.update({
-      coffeeCount: 0,
-      hasGift: false
-    });
+    // Kuponu kontrol et
+    const couponRef = database().ref(`coupons/${userId}/${couponId}`);
+    const couponSnapshot = await couponRef.once('value');
+    const coupon = couponSnapshot.val();
+
+    if (!coupon) {
+      return {
+        success: false,
+        error: 'Kupon bulunamadı.'
+      };
+    }
+
+    if (coupon.cafeName !== cafeName) {
+      return {
+        success: false,
+        error: 'Bu kupon başka bir kafeye aittir.'
+      };
+    }
+
+    // Kuponu sil
+    await couponRef.remove();
 
     return {
       success: true,
-      message: 'Hediye başarıyla kullanıldı.'
+      message: 'Hediye başarıyla kullanıldı.',
+      userName: `${userData.name} ${userData.surname}`
     };
   } catch (error) {
     return { success: false, error: error.message };

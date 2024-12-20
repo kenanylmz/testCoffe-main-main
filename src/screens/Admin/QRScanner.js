@@ -12,59 +12,29 @@ const QRScanner = () => {
     try {
       console.log('Okunan QR kod:', qrData); // QR kod içeriğini logla
 
-      // QR kod içeriğini parse et
-      let type, userId, cafeName;
-      
       let parsedQR;
       try {
         parsedQR = JSON.parse(qrData);
-        
-        // Cafe QR formatı kontrolü
-        if (parsedQR.userId && parsedQR.cafeName) {
-          // Cafe QR kodu - otomatik olarak kahve tipi olarak işle
-          type = 'coffee';
-          userId = parsedQR.userId;
-          cafeName = parsedQR.cafeName;
-        } else {
-          // Standart QR format kontrolü
-          type = parsedQR.type;
-          userId = parsedQR.userId;
-          cafeName = parsedQR.cafeName;
-        }
       } catch {
-        // JSON parse edilemezse string format olarak dene
-        const parts = qrData.split(':');
-        if (parts.length >= 2) {
-          type = parts[0];
-          userId = parts[1];
+        throw new Error('QR kod geçersiz formatta.');
+      }
+
+      // Kupon QR kodu kontrolü
+      if (parsedQR.couponId && parsedQR.userId && parsedQR.cafeName) {
+        // Kupon kullanımı
+        const result = await redeemGift(parsedQR.userId, parsedQR.cafeName, parsedQR.couponId);
+        if (result.success) {
+          Alert.alert('Başarılı', `${result.userName} Adlı Kullanıcının Bir Adet Hediye Kuponu Kullanılmıştır`, [{ text: 'Tamam' }]);
+        } else {
+          throw new Error(result.error);
         }
-      }
-
-      console.log('Parse edilen değerler:', { type, userId }); // Parse edilen değerleri logla
-
-      if (!type || !userId) {
-        throw new Error('QR kod geçersiz formatta. Lütfen Müdavim sayfasından yeni bir QR kod oluşturun.');
-      }
-
-      // type değerlerini küçük harfe çevir
-      type = type.toLowerCase().trim();
-
-      if (!cafeName) {
-        throw new Error('QR kodunda kafe adı bulunamadı. Lütfen Müdavim sayfasından yeni bir QR kod oluşturun.');
-      }
-
-      if (type === 'coffee' || type === 'kahve') {
-        // QR kodundan gelen timestamp'i kullan
-        if (!parsedQR.timestamp) {
-          throw new Error('QR kodunda zaman bilgisi bulunamadı. Lütfen Müdavim sayfasından yeni bir QR kod oluşturun.');
-        }
-
-        // Timestamp'i güvenli formata dönüştür (nokta ve diğer özel karakterleri kaldır)
+      } else if (parsedQR.userId && parsedQR.cafeName && parsedQR.timestamp) {
+        // Kahve QR kodu işleme
         const safeTimestamp = parsedQR.timestamp.replace(/[.:\-]/g, '');
         
-        const result = await incrementCoffeeCount(userId, cafeName, {
-          userId: userId,
-          cafeName: cafeName,
+        const result = await incrementCoffeeCount(parsedQR.userId, parsedQR.cafeName, {
+          userId: parsedQR.userId,
+          cafeName: parsedQR.cafeName,
           timestamp: safeTimestamp
         });
         if (result.success) {
@@ -78,16 +48,8 @@ const QRScanner = () => {
         } else {
           throw new Error(result.error);
         }
-      } else if (type === 'gift' || type === 'hediye') {
-        // Hediye kullanımı
-        const result = await redeemGift(userId, cafeName);
-        if (result.success) {
-          Alert.alert('Başarılı', 'Hediye başarıyla kullanıldı!', [{ text: 'Tamam' }]);
-        } else {
-          throw new Error(result.error);
-        }
       } else {
-        throw new Error(`Geçersiz QR kod tipi: ${type}. Lütfen geçerli bir QR kod okutun.`);
+        throw new Error('QR kod geçersiz formatta. Lütfen Müdavim sayfasından yeni bir QR kod oluşturun.');
       }
     } catch (error) {
       // Sadece Alert göster, loglama yapma
