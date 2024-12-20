@@ -256,10 +256,16 @@ export const incrementCoffeeCount = async (userId, cafeName, qrData) => {
       hasGift: hasGift
     });
 
-    // 5 kahveye ulaşıldıysa biraz bekle ve sonra sıfırla
+    // 5 kahveye ulaşıldıysa kupon oluştur ve sayacı sıfırla
     if (coffeeCount >= 5) {
-      // 3 saniye bekle (kuponun oluşturulması için)
-      await new Promise(resolve => setTimeout(resolve, 3000));
+      // Kupon oluştur
+      const couponRef = database().ref(`/coupons/${userId}`).push();
+      await couponRef.set({
+        cafeName: cafeName,
+        createdAt: database.ServerValue.TIMESTAMP,
+        expiryDate: new Date(Date.now() + (3 * 24 * 60 * 60 * 1000)).toISOString(), // 3 gün geçerli
+        isUsed: false
+      });
       
       // Sayacı sıfırla
       await userCafeRef.update({

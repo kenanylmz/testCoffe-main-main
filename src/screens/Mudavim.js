@@ -29,12 +29,11 @@ const Mudavim = ({route}) => {
         if (cafeData) {
           setProgress(cafeData.coffeeCount || 0);
           
-          // Eğer 5 kahveye ulaşıldıysa ve kupon oluşturulmadıysa
+          // 5 kahveye ulaşıldığında bildirim göster
           if (cafeData.coffeeCount === 5 && cafeData.hasGift) {
-            createCoupon();
             Alert.alert(
               'Tebrikler! 🎉',
-              'Müdavim seviyesine ulaştınız!',
+              'Müdavim seviyesine ulaştınız! Kuponlarım sayfasından hediye kahve kuponunuzu görebilirsiniz.',
               [{ text: 'Tamam', style: 'default' }],
               { cancelable: true }
             );
@@ -45,27 +44,6 @@ const Mudavim = ({route}) => {
       return () => userCafeRef.off('value', unsubscribe);
     }
   }, [currentUser, cafeName]);
-
-  const createCoupon = async () => {
-    try {
-      const creationDate = new Date().toISOString();
-      const expiryDate = new Date();
-      expiryDate.setDate(expiryDate.getDate() + 3); // 3 days from now
-
-      const newCouponRef = database()
-        .ref(`/coupons/${currentUser.uid}`)
-        .push();
-
-      await newCouponRef.set({
-        cafeName: cafeName,
-        createdAt: creationDate,
-        expiryDate: expiryDate.toISOString(),
-        isUsed: false,
-      });
-    } catch (error) {
-      console.error('Error creating coupon:', error);
-    }
-  };
 
   // Generate unique QR code value
   const qrValue = JSON.stringify({
