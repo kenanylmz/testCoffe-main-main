@@ -21,6 +21,31 @@ const Mudavim = ({route}) => {
   const currentUser = auth().currentUser;
   const [progress, setProgress] = useState(0);
 
+  useEffect(() => {
+    if (currentUser && cafeName) {
+      const userCafeRef = database().ref(`users/${currentUser.uid}/cafes/${cafeName}`);
+      const unsubscribe = userCafeRef.on('value', (snapshot) => {
+        const cafeData = snapshot.val();
+        if (cafeData) {
+          setProgress(cafeData.coffeeCount || 0);
+          
+          // Eğer 5 kahveye ulaşıldıysa ve kupon oluşturulmadıysa
+          if (cafeData.coffeeCount === 5 && cafeData.hasGift) {
+            createCoupon();
+            Alert.alert(
+              'Tebrikler! 🎉',
+              'Müdavim seviyesine ulaştınız!',
+              [{ text: 'Tamam', style: 'default' }],
+              { cancelable: true }
+            );
+          }
+        }
+      });
+
+      return () => userCafeRef.off('value', unsubscribe);
+    }
+  }, [currentUser, cafeName]);
+
   const createCoupon = async () => {
     try {
       const creationDate = new Date().toISOString();
@@ -39,30 +64,6 @@ const Mudavim = ({route}) => {
       });
     } catch (error) {
       console.error('Error creating coupon:', error);
-    }
-  };
-
-  const handleProgressPress = () => {
-    if (progress < 5) {
-      const newProgress = progress + 1;
-      setProgress(newProgress);
-      if (newProgress === 5) {
-        createCoupon();
-        Alert.alert(
-          'Tebrikler! 🎉',
-          'Müdavim seviyesine ulaştınız!',
-          [
-            {
-              text: 'Tamam',
-              style: 'default',
-              onPress: () => setProgress(0), // Reset progress after creating coupon
-            },
-          ],
-          {
-            cancelable: true,
-          },
-        );
-      }
     }
   };
 
@@ -110,15 +111,12 @@ const Mudavim = ({route}) => {
         </View>
 
         <View style={styles.progressSection}>
-          <TouchableOpacity
-            onPress={handleProgressPress}
-            activeOpacity={0.8}
-            style={styles.imageContainer}>
+          <View style={styles.imageContainer}>
             <Image
               source={require('../styles/mudavim1.png')}
               style={styles.mudavimImage}
             />
-          </TouchableOpacity>
+          </View>
 
           <View style={styles.progressBarContainer}>
             <View

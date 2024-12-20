@@ -26,16 +26,15 @@ const Login = ({navigation}) => {
 
     try {
       setLoading(true);
-      console.log('Attempting login with email:', email); // Debug log
       
       const result = await signIn(email, password);
-      console.log('Login result:', result); // Debug log
+      console.log('Login result:', result);
       
-      if (result.success) {
+      if (result.success && result.user) {
         if (!result.user.emailVerified) {
           // If email is not verified, navigate to verification screen
           navigation.navigate('Dogrulama', {
-            email: email,
+            email: result.user.email,
             userId: result.user.uid,
           });
         }
@@ -43,24 +42,26 @@ const Login = ({navigation}) => {
         console.log('User role from login:', result.role);
         
         // We don't need to navigate here as App.tsx will handle it based on auth state
-      } else {
+      } else if (!result.success) {
         // Show specific error message from Firebase
         let errorMessage = 'Giriş yapılamadı.';
-        switch (result.error) {
-          case 'auth/invalid-email':
-            errorMessage = 'Geçersiz e-posta adresi.';
-            break;
-          case 'auth/user-disabled':
-            errorMessage = 'Bu hesap devre dışı bırakılmış.';
-            break;
-          case 'auth/user-not-found':
-            errorMessage = 'Bu e-posta adresi ile kayıtlı kullanıcı bulunamadı.';
-            break;
-          case 'auth/wrong-password':
-            errorMessage = 'Hatalı şifre.';
-            break;
-          default:
-            errorMessage = result.error;
+        if (result.error && result.error.code) {
+          switch (result.error.code) {
+            case 'auth/invalid-email':
+              errorMessage = 'Geçersiz e-posta adresi.';
+              break;
+            case 'auth/user-disabled':
+              errorMessage = 'Bu hesap devre dışı bırakılmış.';
+              break;
+            case 'auth/user-not-found':
+              errorMessage = 'Bu e-posta adresi ile kayıtlı kullanıcı bulunamadı.';
+              break;
+            case 'auth/wrong-password':
+              errorMessage = 'Hatalı şifre.';
+              break;
+            default:
+              errorMessage = result.error.message || 'Giriş yapılamadı.';
+          }
         }
         Alert.alert('Hata', errorMessage);
       }
@@ -98,7 +99,7 @@ const Login = ({navigation}) => {
       <View style={styles.bottomSection}>
         <Text style={styles.welcomeText}>HOŞGELDİNİZ</Text>
         <Text style={styles.instructionText}>
-          Giriş yapmak veya kayıt olmak için telefon numarası giriniz.
+          Giriş yapmak veya kayıt olmak için e-posta ve şifrenizi giriniz.
         </Text>
 
         <TextInput

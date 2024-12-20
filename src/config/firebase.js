@@ -35,23 +35,68 @@ export const signUp = async (email, password, name, surname) => {
 
 export const signIn = async (email, password) => {
   try {
+    if (!email || !password) {
+      return {
+        success: false,
+        error: {
+          code: 'auth/invalid-credentials',
+          message: 'E-posta ve şifre gereklidir.'
+        }
+      };
+    }
+
     const userCredential = await auth().signInWithEmailAndPassword(email, password);
     
+    if (!userCredential || !userCredential.user) {
+      return {
+        success: false,
+        error: {
+          code: 'auth/unknown',
+          message: 'Giriş işlemi başarısız oldu.'
+        }
+      };
+    }
+
     // Get user role from database
     const userSnapshot = await database()
       .ref(`users/${userCredential.user.uid}`)
       .once('value');
     
     const userData = userSnapshot.val();
-    const userRole = userData?.role || 'user';
+    
+    // If user data doesn't exist in database, create it with default role
+    if (!userData) {
+      const defaultUserData = {
+        email: userCredential.user.email,
+        role: 'user',
+        createdAt: database.ServerValue.TIMESTAMP
+      };
+      
+      await database()
+        .ref(`users/${userCredential.user.uid}`)
+        .set(defaultUserData);
+        
+      return {
+        success: true,
+        user: userCredential.user,
+        role: 'user'
+      };
+    }
 
     return { 
       success: true, 
       user: userCredential.user,
-      role: userRole 
+      role: userData.role || 'user'
     };
   } catch (error) {
-    return { success: false, error: error.message };
+    console.error('SignIn Error:', error);
+    return { 
+      success: false, 
+      error: {
+        code: error.code || 'auth/unknown',
+        message: error.message || 'Giriş yapılırken bir hata oluştu.'
+      }
+    };
   }
 };
 
@@ -157,6 +202,107 @@ export const deleteAdmin = async (adminId) => {
     return { 
       success: true, 
       message: 'Admin başarıyla silindi.'
+    };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+};
+
+// QR kodunun kullanılıp kullanılmadığını kontrol et
+const checkQRUsage = async (qrData) => {
+  try {
+    const qrRef = database().ref(`usedQRCodes/${qrData.userId}/${qrData.timestamp}`);
+    const snapshot = await qrRef.once('value');
+    
+    if (snapshot.exists()) {
+      return {
+        success: false,
+        error: 'Bu QR kod daha önce kullanılmış. Lütfen yeni QR kod oluşturun.'
+      };
+    }
+
+    // QR kodu kullanıldı olarak işaretle
+    await qrRef.set({
+      cafeName: qrData.cafeName,
+      usedAt: database.ServerValue.TIMESTAMP
+    });
+
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+};
+
+// Kahve sayısını artır ve hediye durumunu kontrol et
+export const incrementCoffeeCount = async (userId, cafeName, qrData) => {
+  try {
+    // Önce QR kodunun kullanılıp kullanılmadığını kontrol et
+    const qrCheck = await checkQRUsage(qrData);
+    if (!qrCheck.success) {
+      return qrCheck;
+    }
+
+    const userCafeRef = database().ref(`users/${userId}/cafes/${cafeName}`);
+    const snapshot = await userCafeRef.once('value');
+    const cafeData = snapshot.val();
+
+    // Kahve sayısını artır
+    let coffeeCount = (cafeData?.coffeeCount || 0) + 1;
+    const hasGift = coffeeCount >= 5;
+
+    // Önce mevcut durumu kaydet
+    await userCafeRef.update({
+      coffeeCount: coffeeCount,
+      hasGift: hasGift
+    });
+
+    // 5 kahveye ulaşıldıysa biraz bekle ve sonra sıfırla
+    if (coffeeCount >= 5) {
+      // 3 saniye bekle (kuponun oluşturulması için)
+      await new Promise(resolve => setTimeout(resolve, 3000));
+      
+      // Sayacı sıfırla
+      await userCafeRef.update({
+        coffeeCount: 0,
+        hasGift: true
+      });
+      
+      coffeeCount = 0;
+    }
+
+    return {
+      success: true,
+      coffeeCount: coffeeCount,
+      hasGift: hasGift
+    };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+};
+
+// Hediye kullanımını işle
+export const redeemGift = async (userId, cafeName) => {
+  try {
+    const userCafeRef = database().ref(`users/${userId}/cafes/${cafeName}`);
+    const snapshot = await userCafeRef.once('value');
+    const cafeData = snapshot.val();
+
+    if (!cafeData?.hasGift) {
+      return {
+        success: false,
+        error: 'Hediye hakkı bulunmamaktadır.'
+      };
+    }
+
+    // Hediyeyi kullan ve kahve sayısını sıfırla
+    await userCafeRef.update({
+      coffeeCount: 0,
+      hasGift: false
+    });
+
+    return {
+      success: true,
+      message: 'Hediye başarıyla kullanıldı.'
     };
   } catch (error) {
     return { success: false, error: error.message };

@@ -1,23 +1,111 @@
 import React, { useEffect, useState } from 'react';
 import { View, StyleSheet, Text, TouchableOpacity, Alert } from 'react-native';
 import { Camera, useCameraDevice, useCodeScanner } from 'react-native-vision-camera';
+import { incrementCoffeeCount, redeemGift } from '../../config/firebase';
 
 const QRScanner = () => {
   const [hasPermission, setHasPermission] = useState(null);
+  const [isScanning, setIsScanning] = useState(true);
   const device = useCameraDevice('back');
+
+  const handleQRCode = async (qrData) => {
+    try {
+      console.log('Okunan QR kod:', qrData); // QR kod içeriğini logla
+
+      // QR kod içeriğini parse et
+      let type, userId, cafeName;
+      
+      let parsedQR;
+      try {
+        parsedQR = JSON.parse(qrData);
+        
+        // Cafe QR formatı kontrolü
+        if (parsedQR.userId && parsedQR.cafeName) {
+          // Cafe QR kodu - otomatik olarak kahve tipi olarak işle
+          type = 'coffee';
+          userId = parsedQR.userId;
+          cafeName = parsedQR.cafeName;
+        } else {
+          // Standart QR format kontrolü
+          type = parsedQR.type;
+          userId = parsedQR.userId;
+          cafeName = parsedQR.cafeName;
+        }
+      } catch {
+        // JSON parse edilemezse string format olarak dene
+        const parts = qrData.split(':');
+        if (parts.length >= 2) {
+          type = parts[0];
+          userId = parts[1];
+        }
+      }
+
+      console.log('Parse edilen değerler:', { type, userId }); // Parse edilen değerleri logla
+
+      if (!type || !userId) {
+        throw new Error('QR kod geçersiz formatta. Lütfen Müdavim sayfasından yeni bir QR kod oluşturun.');
+      }
+
+      // type değerlerini küçük harfe çevir
+      type = type.toLowerCase().trim();
+
+      if (!cafeName) {
+        throw new Error('QR kodunda kafe adı bulunamadı. Lütfen Müdavim sayfasından yeni bir QR kod oluşturun.');
+      }
+
+      if (type === 'coffee' || type === 'kahve') {
+        // QR kodundan gelen timestamp'i kullan
+        if (!parsedQR.timestamp) {
+          throw new Error('QR kodunda zaman bilgisi bulunamadı. Lütfen Müdavim sayfasından yeni bir QR kod oluşturun.');
+        }
+
+        // Timestamp'i güvenli formata dönüştür (nokta ve diğer özel karakterleri kaldır)
+        const safeTimestamp = parsedQR.timestamp.replace(/[.:\-]/g, '');
+        
+        const result = await incrementCoffeeCount(userId, cafeName, {
+          userId: userId,
+          cafeName: cafeName,
+          timestamp: safeTimestamp
+        });
+        if (result.success) {
+          Alert.alert(
+            'Başarılı',
+            result.hasGift 
+              ? `5 kahve tamamlandı! Hediye kazanıldı!`
+              : `Kahve sayısı: ${result.coffeeCount}/5`,
+            [{ text: 'Tamam' }]
+          );
+        } else {
+          throw new Error(result.error);
+        }
+      } else if (type === 'gift' || type === 'hediye') {
+        // Hediye kullanımı
+        const result = await redeemGift(userId, cafeName);
+        if (result.success) {
+          Alert.alert('Başarılı', 'Hediye başarıyla kullanıldı!', [{ text: 'Tamam' }]);
+        } else {
+          throw new Error(result.error);
+        }
+      } else {
+        throw new Error(`Geçersiz QR kod tipi: ${type}. Lütfen geçerli bir QR kod okutun.`);
+      }
+    } catch (error) {
+      // Sadece Alert göster, loglama yapma
+      Alert.alert('Hata', error.message, [{ text: 'Tamam' }]);
+    } finally {
+      // 2 saniye sonra yeni taramaya izin ver
+      setTimeout(() => {
+        setIsScanning(true);
+      }, 2000);
+    }
+  };
 
   const codeScanner = useCodeScanner({
     codeTypes: ['qr'],
     onCodeScanned: (codes) => {
-      if (codes.length > 0) {
-        Alert.alert(
-          'QR Kod Okundu',
-          codes[0].value,
-          [
-            { text: 'Tamam', onPress: () => console.log('QR Code:', codes[0].value) }
-          ],
-          { cancelable: false }
-        );
+      if (codes.length > 0 && isScanning) {
+        setIsScanning(false);
+        handleQRCode(codes[0].value);
       }
     }
   });

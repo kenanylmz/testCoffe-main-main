@@ -8,19 +8,26 @@ import {
   Linking,
 } from 'react-native';
 import {checkEmailVerification, resendVerificationEmail} from '../config/firebase';
+import auth from '@react-native-firebase/auth';
 
 const Dogrulama = ({route, navigation}) => {
-  const {email} = route.params;
+  const currentUser = auth().currentUser;
+  const email = route.params?.email || currentUser?.email || 'your email';
   const [loading, setLoading] = useState(false);
   const [checking, setChecking] = useState(false);
 
   const checkVerification = async () => {
-    setChecking(true);
-    const result = await checkEmailVerification();
-    setChecking(false);
+    if (!currentUser) {
+      Alert.alert('Hata', 'Kullanıcı oturumu bulunamadı.');
+      return;
+    }
 
-    if (result.success) {
-      if (result.isVerified) {
+    setChecking(true);
+    try {
+      await currentUser.reload(); // Kullanıcı bilgilerini yenile
+      const isVerified = currentUser.emailVerified;
+      
+      if (isVerified) {
         Alert.alert(
           'Başarılı',
           'E-posta adresiniz doğrulandı!',
@@ -35,20 +42,27 @@ const Dogrulama = ({route, navigation}) => {
       } else {
         Alert.alert('Bilgi', 'E-posta adresiniz henüz doğrulanmamış.');
       }
-    } else {
-      Alert.alert('Hata', result.error || 'Doğrulama kontrolü başarısız oldu.');
+    } catch (error) {
+      Alert.alert('Hata', error.message || 'Doğrulama kontrolü başarısız oldu.');
+    } finally {
+      setChecking(false);
     }
   };
 
   const handleResendEmail = async () => {
-    setLoading(true);
-    const result = await resendVerificationEmail();
-    setLoading(false);
+    if (!currentUser) {
+      Alert.alert('Hata', 'Kullanıcı oturumu bulunamadı.');
+      return;
+    }
 
-    if (result.success) {
-      Alert.alert('Başarılı', result.message);
-    } else {
-      Alert.alert('Hata', result.error || 'E-posta gönderimi başarısız oldu.');
+    setLoading(true);
+    try {
+      await currentUser.sendEmailVerification();
+      Alert.alert('Başarılı', 'Doğrulama e-postası tekrar gönderildi.');
+    } catch (error) {
+      Alert.alert('Hata', error.message || 'E-posta gönderimi başarısız oldu.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -67,7 +81,9 @@ const Dogrulama = ({route, navigation}) => {
         <Text style={styles.title}>E-posta Doğrulama</Text>
         
         <Text style={styles.description}>
-          Lütfen {email} adresine gönderilen doğrulama e-postasını onaylayın.
+          {email === 'your email' 
+            ? 'Lütfen e-posta adresinize gönderilen doğrulama e-postasını onaylayın.'
+            : `Lütfen ${email} adresine gönderilen doğrulama e-postasını onaylayın.`}
         </Text>
 
         <TouchableOpacity style={styles.button} onPress={openEmail}>
